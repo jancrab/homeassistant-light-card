@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+# Bundled Lit contains significant whitespace inside template strings.
+dist/*.js -whitespace

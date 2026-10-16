@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Light Card · Interactive preview</title>
+<style>
+  *{box-sizing:border-box}body{margin:0;background:#111515;color:#eeefea;font:14px system-ui;--primary-text-color:#eeefea;--secondary-text-color:#a3aca7;--card-background-color:#1b2120;--divider-color:#343d38;--primary-color:#92c9b3;--state-icon-color:#8a9690;--ha-card-border-radius:18px}body.light{background:#f2f3ee;color:#242b25;--primary-text-color:#242b25;--secondary-text-color:#5c685f;--card-background-color:#fff;--divider-color:#dbe0d8;--primary-color:#366950;--state-icon-color:#748077;--state-light-active-color:#b57820}main{max-width:1060px;margin:0 auto;padding:44px 32px 64px}header{display:flex;justify-content:space-between;align-items:center;gap:20px;border-bottom:1px solid var(--divider-color);padding-bottom:20px}.brand{font-size:12px;letter-spacing:.18em;text-transform:uppercase}.badge{color:var(--secondary-text-color);font-size:12px}.intro{margin:44px 0 36px}.eyebrow{font-size:11px;letter-spacing:.18em;text-transform:uppercase;color:var(--primary-color)}h1{font-size:clamp(32px,5vw,48px);line-height:1.12;font-weight:450;letter-spacing:-.04em;margin:14px 0}p{color:var(--secondary-text-color);line-height:1.7}.intro p{max-width:560px}button,select{min-height:44px;color:inherit;background:var(--card-background-color);border:1px solid var(--divider-color);border-radius:12px;padding:0 14px;font:inherit;cursor:pointer}.preview{margin:28px 0 42px}.section-label{font-size:11px;text-transform:uppercase;letter-spacing:.14em;color:var(--secondary-text-color);margin-bottom:16px}.bottom{display:grid;grid-template-columns:1fr 1fr;gap:32px}.note{padding:20px 0;border-top:1px solid var(--divider-color)}.tools{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:24px}#log{font-size:12px;min-height:42px;color:var(--secondary-text-color);overflow-wrap:anywhere}code{font-size:12px} @media(max-width:650px){main{padding:24px 16px}.bottom{grid-template-columns:1fr}.badge{max-width:160px;text-align:right}}
+</style>
+<main>
+  <header><span class="brand">Light Card / 01</span><span class="badge">Interactive simulation · no HA connection</span></header>
+  <div class="intro"><span class="eyebrow">A little more atmosphere. A little less UI.</span><h1>Your lights.<br>One quiet place.</h1><p>Room to breathe on the wall. Just the essentials on your phone. One shared configuration for every light and device.</p></div>
+  <div class="section-label">01 / Wall display · shared controls</div>
+  <div class="preview"><homeassistant-light-card id="tablet"></homeassistant-light-card></div>
+  <div class="bottom"><div><div class="section-label">02 / Everyday · compact</div><homeassistant-light-card id="compact"></homeassistant-light-card></div><div><div class="section-label">03 / Just the essentials</div><homeassistant-light-card id="minimal"></homeassistant-light-card><div class="note"><strong>Same devices. Your level of detail.</strong><p>Tap an icon to toggle. Drag to dim. Switch the tablet preview to its compact view. All previews share the same simulated devices.</p><code>4 entities · 1 configuration</code></div></div></div>
+  <div class="tools"><button id="theme">Switch theme</button><button id="offline">Simulate unavailable</button><button id="failure">Fail next action</button></div><p id="log" role="status">Ready. These controls only change simulated state.</p>
+</main>
+<script type="module">
+// Minimal HA icon stand-in, only used in this simulated demo. Production uses HA's icon component.
+class DemoIcon extends HTMLElement {
+  set icon(value) {
+    const path = value?.includes('socket') ? '<rect x="5" y="3" width="14" height="18" rx="3"/><circle cx="12" cy="12" r="4"/><path d="M10.5 11v2m3-2v2"/>' : value?.includes('floor') ? '<path d="M7 3h10l3 9H4zM12 12v9m-5 0h10"/>' : '<path d="M9 18h6m-6 3h6M8 14a7 7 0 1 1 8 0c-1 .8-1 2-1 2H9s0-1.2-1-2Z"/>';
+    this.innerHTML = `<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="currentColor" stroke-width="1.35" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`;
+    this.style.cssText = 'display:block;width:var(--mdc-icon-size,24px);height:var(--mdc-icon-size,24px)';
+  }
+}
+customElements.define('ha-icon', DemoIcon);
+await import('../dist/homeassistant-light-card.js');
+const ids = ['light.living_room','light.dining','light.reading','switch.corner'];
+const values = [['Living room','on',184,[255,197,120]],['Dining','off',0,[255,225,180]],['Reading light','on',89,[196,218,255]],['Corner plug','off',0]];
+let failure = false;
+const cards = ['tablet','compact','minimal'].map(id => document.getElementById(id));
+const hass = { language: 'en', states: Object.fromEntries(ids.map((id,i) => [id,{entity_id:id,state:values[i][1],last_changed:new Date(Date.now()-(i+1)*60000).toISOString(),attributes:{friendly_name:values[i][0],brightness:values[i][2],rgb_color:values[i][3],supported_color_modes:id.startsWith('light.')?['rgb']:undefined,icon:i===2?'mdi:floor-lamp':undefined}}])), callService: async (domain, service, data) => {
+  document.getElementById('log').textContent = `Simulated: ${domain}.${service} → ${data.entity_id}${data.brightness_pct !== undefined ? ' · ' + data.brightness_pct + '%' : ''}`;
+  await new Promise(resolve=>setTimeout(resolve,250));
+  if (failure) { failure=false; throw new Error('Simulated connection error. Tap again to retry.'); }
+  const old = hass.states[data.entity_id];
+  const next = service==='toggle' ? (old.state==='on'?'off':'on') : service==='turn_off'?'off':'on';
+  hass.states[data.entity_id] = {...old,state:next,last_changed:next===old.state?old.last_changed:new Date().toISOString(),attributes:{...old.attributes,brightness:data.brightness_pct!==undefined?Math.round(data.brightness_pct*2.55):old.attributes.brightness || 128}};
+  cards.forEach(card=>card.hass=hass);
+}};
+cards[0].setConfig({entities:ids,title:'Living spaces',show_layout_toggle:true,appearance:{show_last_changed:true},compact:{show_last_changed:false}});
+cards[1].setConfig({entities:ids.slice(0,3),layout:'compact',appearance:{show_last_changed:true}});
+cards[2].setConfig({entities:ids,columns:4,appearance:{show_name:false,show_state:false,show_brightness:false,icon_size:40}});
+cards.forEach(card=>{card.hass=hass;card.addEventListener('hass-more-info',event=>document.getElementById('log').textContent=`Simulated more-info: ${event.detail.entityId}`)});
+document.getElementById('theme').onclick=()=>document.body.classList.toggle('light');
+document.getElementById('failure').onclick=()=>{failure=true;document.getElementById('log').textContent='The next simulated device action will fail.'};
+document.getElementById('offline').onclick=()=>{const old=hass.states[ids[0]];hass.states[ids[0]]={...old,state:old.state==='unavailable'?'on':'unavailable'};cards.forEach(card=>card.hass=hass)};
+</script>
+</html>
